@@ -97,39 +97,61 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto mt-10 p-4">
-        <div className="flex justify-between mb-4">
-          <h1 className="text-2xl font-bold">Hello, {user.email}</h1>
+      <div className="max-w-4xl mx-auto mt-10 p-4">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-800">
+            Hello, {user.email}
+          </h1>
           <button
             onClick={handleLogout}
-            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
           >
             Logout
           </button>
         </div>
 
-        <div className="bg-white shadow rounded p-4 mb-4">
-          <Calendar value={value} onChange={setValue} tileContent={tileContent} />
+        {/* Calendar Card */}
+        <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 shadow-lg rounded-xl p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">
+            Your Activity Calendar
+          </h2>
+          <Calendar
+            value={value}
+            onChange={setValue}
+            tileContent={tileContent}
+            className="rounded-lg overflow-hidden"
+          />
         </div>
 
-        <div className="flex justify-center gap-4 mb-4">
+        {/* Action Buttons */}
+        <div className="flex justify-center gap-6 mb-6">
           <button
             onClick={() => handleAction("streak")}
-            className="bg-orange-500 text-white px-6 py-2 rounded"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl shadow-lg font-semibold transition"
           >
             🔥 Streak
           </button>
           <button
             onClick={() => handleAction("break")}
-            className="bg-gray-500 text-white px-6 py-2 rounded"
+            className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl shadow-lg font-semibold transition"
           >
             🛑 Break
           </button>
         </div>
 
-        <div className="flex justify-center gap-8 text-lg font-semibold">
-          <div>🔥 Total Streaks: {counts.streak}</div>
-          <div>🛑 Total Breaks: {counts.break}</div>
+        {/* Bento-style summary */}
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-yellow-100 rounded-xl p-6 flex flex-col items-center shadow-md">
+            <span className="text-4xl mb-2">🔥</span>
+            <span className="text-lg font-semibold">Total Streaks</span>
+            <span className="text-2xl font-bold">{counts.streak}</span>
+          </div>
+          <div className="bg-blue-100 rounded-xl p-6 flex flex-col items-center shadow-md">
+            <span className="text-4xl mb-2">🛑</span>
+            <span className="text-lg font-semibold">Total Breaks</span>
+            <span className="text-2xl font-bold">{counts.break}</span>
+          </div>
         </div>
       </div>
     </Layout>
