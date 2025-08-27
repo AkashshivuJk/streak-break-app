@@ -1,4 +1,3 @@
-// pages/home.js
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Calendar from "react-calendar";
@@ -13,7 +12,7 @@ export default function Home() {
   const [value, setValue] = useState(new Date());
   const [totals, setTotals] = useState({ streak_count: 0, break_count: 0 });
 
-  // Get user from router
+  // Set user from query
   useEffect(() => {
     if (!router.query.user) return;
     setUser(JSON.parse(router.query.user));
@@ -21,62 +20,68 @@ export default function Home() {
 
   // Fetch activities and totals
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchActivities = async () => {
       if (!user) return;
-
-      // Fetch user activity
-      const { data: acts } = await supabase
+      const { data } = await supabase
         .from("user_activity")
         .select("*")
         .eq("user_id", user.id);
 
       const map = {};
-      acts.forEach((a) => (map[a.date] = a.action));
+      data.forEach((a) => (map[a.date] = a.action));
       setActivities(map);
 
       // Calculate totals
-      const streaks = acts.filter((a) => a.action === "streak").length;
-      const breaks = acts.filter((a) => a.action === "break").length;
+      const streaks = data.filter((a) => a.action === "streak").length;
+      const breaks = data.filter((a) => a.action === "break").length;
       setTotals({ streak_count: streaks, break_count: breaks });
     };
 
-    fetchData();
+    fetchActivities();
   }, [user]);
 
-  // Only allow today to be clicked
-  const handleDayClick = async (action) => {
+  // Handle streak/break click (only today allowed)
+  const handleActionClick = async (action) => {
     if (!user) return;
-   const today = new Date();
-const d = today.getFullYear() + "-" +
-          String(today.getMonth() + 1).padStart(2, "0") + "-" +
-          String(today.getDate()).padStart(2, "0");
 
+    const today = new Date();
+    const d = today.toLocaleDateString("en-CA"); // YYYY-MM-DD local
 
-    if (activities[d]) return alert("Already selected today!");
+    if (activities[d]) return alert("You already selected today!");
 
-    const { error } = await supabase.from("user_activity").insert([
-      {
-        user_id: user.id,
-        date: d,
-        action,
-      },
-    ]);
+    try {
+      const { error } = await supabase.from("user_activity").insert([
+        { user_id: user.id, date: d, action },
+      ]);
 
-    if (error) return alert("Error saving activity");
+      if (error) return alert("Error saving activity");
 
-    setActivities({ ...activities, [d]: action });
-    setTotals({
-      streak_count: totals.streak_count + (action === "streak" ? 1 : 0),
-      break_count: totals.break_count + (action === "break" ? 1 : 0),
-    });
+      setActivities({ ...activities, [d]: action });
+      setTotals({
+        streak_count: totals.streak_count + (action === "streak" ? 1 : 0),
+        break_count: totals.break_count + (action === "break" ? 1 : 0),
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Error saving action");
+    }
   };
 
+  // Show fire/break emoji in calendar
   const tileContent = ({ date, view }) => {
     if (view !== "month") return null;
-    const d = date.toISOString().split("T")[0];
+    const d = date.toLocaleDateString("en-CA");
     if (activities[d] === "streak") return <span>🔥</span>;
     if (activities[d] === "break") return <span>🛑</span>;
     return null;
+  };
+
+  // Disable all days except today
+  const tileDisabled = ({ date, view }) => {
+    if (view !== "month") return false;
+    const today = new Date().toLocaleDateString("en-CA");
+    const d = date.toLocaleDateString("en-CA");
+    return d !== today;
   };
 
   const handleLogout = () => router.push("/");
@@ -103,6 +108,7 @@ const d = today.getFullYear() + "-" +
             value={value}
             onChange={setValue}
             tileContent={tileContent}
+            tileDisabled={tileDisabled}
             className="react-calendar-custom"
           />
         </div>
@@ -110,13 +116,13 @@ const d = today.getFullYear() + "-" +
         <div className="flex justify-center gap-4 mb-6">
           <button
             className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600"
-            onClick={() => handleDayClick("streak")}
+            onClick={() => handleActionClick("streak")}
           >
             🔥 Streak
           </button>
           <button
             className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600"
-            onClick={() => handleDayClick("break")}
+            onClick={() => handleActionClick("break")}
           >
             🛑 Break
           </button>
@@ -125,11 +131,15 @@ const d = today.getFullYear() + "-" +
         <div className="grid grid-cols-2 gap-6">
           <div className="bg-yellow-100 p-6 rounded shadow text-center">
             <h2 className="text-xl font-semibold mb-2">Total Streaks</h2>
-            <p className="text-3xl font-bold text-yellow-600">{totals.streak_count}</p>
+            <p className="text-3xl font-bold text-yellow-600">
+              {totals.streak_count}
+            </p>
           </div>
           <div className="bg-blue-100 p-6 rounded shadow text-center">
             <h2 className="text-xl font-semibold mb-2">Total Breaks</h2>
-            <p className="text-3xl font-bold text-blue-600">{totals.break_count}</p>
+            <p className="text-3xl font-bold text-blue-600">
+              {totals.break_count}
+            </p>
           </div>
         </div>
       </div>
