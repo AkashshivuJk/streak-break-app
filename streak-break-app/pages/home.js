@@ -1,3 +1,4 @@
+// pages/home.js
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Calendar from "react-calendar";
@@ -10,73 +11,60 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [activities, setActivities] = useState({});
   const [value, setValue] = useState(new Date());
-  const [counts, setCounts] = useState({ streak: 0, break: 0 });
+  const [totals, setTotals] = useState({ streak_count: 0, break_count: 0 });
 
-  // Get current logged-in user
+  // Get user from router
   useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        router.push("/");
-      } else {
-        setUser(data.user);
-      }
-    };
-    getUser();
-  }, [router]);
+    if (!router.query.user) return;
+    setUser(JSON.parse(router.query.user));
+  }, [router.query.user]);
 
-  // Fetch user activities
+  // Fetch activities and totals
   useEffect(() => {
-    const fetchActivities = async () => {
+    const fetchData = async () => {
       if (!user) return;
-      const { data, error } = await supabase
+
+      // Fetch user activity
+      const { data: acts } = await supabase
         .from("user_activity")
         .select("*")
         .eq("user_id", user.id);
 
-      if (error) {
-        console.error(error);
-        return;
-      }
-
       const map = {};
-      let streakCount = 0;
-      let breakCount = 0;
-
-      data.forEach((a) => {
-        map[a.date] = a.action;
-        if (a.action === "streak") streakCount++;
-        else if (a.action === "break") breakCount++;
-      });
-
+      acts.forEach((a) => (map[a.date] = a.action));
       setActivities(map);
-      setCounts({ streak: streakCount, break: breakCount });
+
+      // Calculate totals
+      const streaks = acts.filter((a) => a.action === "streak").length;
+      const breaks = acts.filter((a) => a.action === "break").length;
+      setTotals({ streak_count: streaks, break_count: breaks });
     };
-    fetchActivities();
+
+    fetchData();
   }, [user]);
 
-  // Handle streak/break click (only today)
-  const handleAction = async (action) => {
+  // Only allow today to be clicked
+  const handleDayClick = async (action) => {
     if (!user) return;
+    const today = new Date();
+    const d = today.toISOString().split("T")[0];
 
-    const today = new Date().toISOString().split("T")[0];
-
-    if (activities[today]) return alert("You already selected today!");
+    if (activities[d]) return alert("Already selected today!");
 
     const { error } = await supabase.from("user_activity").insert([
       {
         user_id: user.id,
-        date: today,
+        date: d,
         action,
       },
     ]);
 
-    if (error) return alert(error.message);
+    if (error) return alert("Error saving activity");
 
-    setActivities({ ...activities, [today]: action });
-    setCounts({
-      streak: counts.streak + (action === "streak" ? 1 : 0),
-      break: counts.break + (action === "break" ? 1 : 0),
+    setActivities({ ...activities, [d]: action });
+    setTotals({
+      streak_count: totals.streak_count + (action === "streak" ? 1 : 0),
+      break_count: totals.break_count + (action === "break" ? 1 : 0),
     });
   };
 
@@ -88,69 +76,57 @@ export default function Home() {
     return null;
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/");
-  };
+  const handleLogout = () => router.push("/");
 
   if (!user) return null;
 
   return (
     <Layout>
       <div className="max-w-4xl mx-auto mt-10 p-4">
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">
-            Hello, {user.email}
+            Hello, {user.username || "User"}
           </h1>
           <button
             onClick={handleLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
           >
             Logout
           </button>
         </div>
 
-        {/* Calendar Card */}
-        <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 shadow-lg rounded-xl p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">
-            Your Activity Calendar
-          </h2>
+        <div className="bg-white shadow rounded p-6 mb-6">
           <Calendar
             value={value}
             onChange={setValue}
             tileContent={tileContent}
-            className="rounded-lg overflow-hidden"
+            className="react-calendar-custom"
           />
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-center gap-6 mb-6">
+        <div className="flex justify-center gap-4 mb-6">
           <button
-            onClick={() => handleAction("streak")}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl shadow-lg font-semibold transition"
+            className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600"
+            onClick={() => handleDayClick("streak")}
           >
             🔥 Streak
           </button>
           <button
-            onClick={() => handleAction("break")}
-            className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl shadow-lg font-semibold transition"
+            className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600"
+            onClick={() => handleDayClick("break")}
           >
             🛑 Break
           </button>
         </div>
 
-        {/* Bento-style summary */}
         <div className="grid grid-cols-2 gap-6">
-          <div className="bg-yellow-100 rounded-xl p-6 flex flex-col items-center shadow-md">
-            <span className="text-4xl mb-2">🔥</span>
-            <span className="text-lg font-semibold">Total Streaks</span>
-            <span className="text-2xl font-bold">{counts.streak}</span>
+          <div className="bg-yellow-100 p-6 rounded shadow text-center">
+            <h2 className="text-xl font-semibold mb-2">Total Streaks</h2>
+            <p className="text-3xl font-bold text-yellow-600">{totals.streak_count}</p>
           </div>
-          <div className="bg-blue-100 rounded-xl p-6 flex flex-col items-center shadow-md">
-            <span className="text-4xl mb-2">🛑</span>
-            <span className="text-lg font-semibold">Total Breaks</span>
-            <span className="text-2xl font-bold">{counts.break}</span>
+          <div className="bg-blue-100 p-6 rounded shadow text-center">
+            <h2 className="text-xl font-semibold mb-2">Total Breaks</h2>
+            <p className="text-3xl font-bold text-blue-600">{totals.break_count}</p>
           </div>
         </div>
       </div>
