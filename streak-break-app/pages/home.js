@@ -1,4 +1,3 @@
-// pages/home.js
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Calendar from "react-calendar";
@@ -13,18 +12,21 @@ export default function Home() {
   const [value, setValue] = useState(new Date());
   const [totals, setTotals] = useState({ streak_count: 0, break_count: 0 });
 
-  // Get user from router
+  // Fetch current user session from Supabase
   useEffect(() => {
-    if (!router.query.user) return;
-    setUser(JSON.parse(router.query.user));
-  }, [router.query.user]);
+    const sessionUser = supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        router.push("/"); // redirect to login if not logged in
+      } else {
+        setUser(data.session.user);
+      }
+    });
+  }, [router]);
 
-  // Fetch activities and totals
+  // Fetch user activity and totals
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
-
-      // Fetch user activity
       const { data: acts } = await supabase
         .from("user_activity")
         .select("*")
@@ -34,7 +36,6 @@ export default function Home() {
       acts.forEach((a) => (map[a.date] = a.action));
       setActivities(map);
 
-      // Calculate totals
       const streaks = acts.filter((a) => a.action === "streak").length;
       const breaks = acts.filter((a) => a.action === "break").length;
       setTotals({ streak_count: streaks, break_count: breaks });
@@ -76,7 +77,10 @@ export default function Home() {
     return null;
   };
 
-  const handleLogout = () => router.push("/");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
+  };
 
   if (!user) return null;
 
@@ -85,7 +89,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto mt-10 p-4">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">
-            Hello, {user.username || "User"}
+            Hello, {user.email || "User"}
           </h1>
           <button
             onClick={handleLogout}
@@ -100,7 +104,6 @@ export default function Home() {
             value={value}
             onChange={setValue}
             tileContent={tileContent}
-            className="react-calendar-custom"
           />
         </div>
 
