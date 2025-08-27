@@ -1,4 +1,3 @@
-// pages/home.js
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Calendar from "react-calendar";
@@ -11,46 +10,76 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [activities, setActivities] = useState({});
   const [value, setValue] = useState(new Date());
-  const [counts, setCounts] = useState({ streak_count: 0, break_count: 0 });
+  const [counts, setCounts] = useState({ streak: 0, break: 0 });
 
-  // Get user from router query (passed from login)
+  // Get current logged-in user
   useEffect(() => {
-    if (!router.query.user) return;
-    setUser(JSON.parse(router.query.user));
-  }, [router.query.user]);
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        router.push("/");
+      } else {
+        setUser(data.user);
+      }
+    };
+    getUser();
+  }, [router]);
 
-  // Fetch activities and counts
+  // Fetch user activities
   useEffect(() => {
     const fetchActivities = async () => {
       if (!user) return;
-
-      const { data: acts } = await supabase
+      const { data, error } = await supabase
         .from("user_activity")
         .select("*")
         .eq("user_id", user.id);
 
+      if (error) {
+        console.error(error);
+        return;
+      }
+
       const map = {};
-      acts.forEach((a) => (map[a.date] = a.action));
+      let streakCount = 0;
+      let breakCount = 0;
+
+      data.forEach((a) => {
+        map[a.date] = a.action;
+        if (a.action === "streak") streakCount++;
+        else if (a.action === "break") breakCount++;
+      });
+
       setActivities(map);
-
-      // Calculate counts
-      const streaks = acts.filter((a) => a.action === "streak").length;
-      const breaks = acts.filter((a) => a.action === "break").length;
-      setCounts({ streak_count: streaks, break_count: breaks });
+      setCounts({ streak: streakCount, break: breakCount });
     };
-
     fetchActivities();
   }, [user]);
 
-  // Only today is clickable
-  const tileDisabled = ({ date, view }) => {
-    if (view !== "month") return false;
+  // Handle streak/break click (only today)
+  const handleAction = async (action) => {
+    if (!user) return;
+
     const today = new Date().toISOString().split("T")[0];
-    const d = date.toISOString().split("T")[0];
-    return d !== today;
+
+    if (activities[today]) return alert("You already selected today!");
+
+    const { error } = await supabase.from("user_activity").insert([
+      {
+        user_id: user.id,
+        date: today,
+        action,
+      },
+    ]);
+
+    if (error) return alert(error.message);
+
+    setActivities({ ...activities, [today]: action });
+    setCounts({
+      streak: counts.streak + (action === "streak" ? 1 : 0),
+      break: counts.break + (action === "break" ? 1 : 0),
+    });
   };
 
-  // Emoji for calendar tiles
   const tileContent = ({ date, view }) => {
     if (view !== "month") return null;
     const d = date.toISOString().split("T")[0];
@@ -59,38 +88,18 @@ export default function Home() {
     return null;
   };
 
-  // Handle streak/break action
-  const handleAction = async (action) => {
-    const today = new Date().toISOString().split("T")[0];
-    if (activities[today]) return alert("Already selected today!");
-
-    const res = await fetch("/api/update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, action, date: today }),
-    });
-
-    const data = await res.json();
-    if (res.ok) {
-      setActivities({ ...activities, [today]: action });
-      setCounts((prev) => ({
-        ...prev,
-        [action === "streak" ? "streak_count" : "break_count"]:
-          prev[action === "streak" ? "streak_count" : "break_count"] + 1,
-      }));
-    } else alert(data.error);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/");
   };
-
-  const handleLogout = () => router.push("/");
 
   if (!user) return null;
 
   return (
     <Layout>
       <div className="max-w-3xl mx-auto mt-10 p-4">
-        {/* Header */}
-        <div className="flex justify-between mb-6 items-center">
-          <h1 className="text-2xl font-bold">Hello, {user.username}</h1>
+        <div className="flex justify-between mb-4">
+          <h1 className="text-2xl font-bold">Hello, {user.email}</h1>
           <button
             onClick={handleLogout}
             className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
@@ -99,45 +108,28 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Calendar */}
-        <div className="bg-white shadow rounded p-4 mb-6">
-          <p className="mb-2">
-            Select your action for today only (🔥 Streak / 🛑 Break)
-          </p>
-          <Calendar
-            value={value}
-            onChange={setValue}
-            tileContent={tileContent}
-            tileDisabled={tileDisabled}
-          />
+        <div className="bg-white shadow rounded p-4 mb-4">
+          <Calendar value={value} onChange={setValue} tileContent={tileContent} />
         </div>
 
-        {/* Action buttons */}
-        <div className="flex justify-center gap-4 mb-6">
+        <div className="flex justify-center gap-4 mb-4">
           <button
-            className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600"
             onClick={() => handleAction("streak")}
+            className="bg-orange-500 text-white px-6 py-2 rounded"
           >
             🔥 Streak
           </button>
           <button
-            className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600"
             onClick={() => handleAction("break")}
+            className="bg-gray-500 text-white px-6 py-2 rounded"
           >
             🛑 Break
           </button>
         </div>
 
-        {/* Bento-style summary cards */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-yellow-100 p-4 rounded shadow flex flex-col items-center">
-            <span className="text-xl font-bold">{counts.streak_count}</span>
-            <span>🔥 Total Streaks</span>
-          </div>
-          <div className="bg-blue-100 p-4 rounded shadow flex flex-col items-center">
-            <span className="text-xl font-bold">{counts.break_count}</span>
-            <span>🛑 Total Breaks</span>
-          </div>
+        <div className="flex justify-center gap-8 text-lg font-semibold">
+          <div>🔥 Total Streaks: {counts.streak}</div>
+          <div>🛑 Total Breaks: {counts.break}</div>
         </div>
       </div>
     </Layout>
