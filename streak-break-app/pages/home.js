@@ -46,8 +46,11 @@ export default function Home() {
   // Only allow today to be clicked
   const handleDayClick = async (action) => {
     if (!user) return;
-    const today = new Date();
-    const d = today.toISOString().split("T")[0];
+   const today = new Date();
+const d = today.getFullYear() + "-" +
+          String(today.getMonth() + 1).padStart(2, "0") + "-" +
+          String(today.getDate()).padStart(2, "0");
+
 
     if (activities[d]) return alert("Already selected today!");
 
