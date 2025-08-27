@@ -1,12 +1,11 @@
-export default function BentoCard({ title, description, onClick }) {
-    return (
-      <div
-        onClick={onClick}
-        className="cursor-pointer p-6 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 hover:scale-105 transition-transform shadow-lg"
-      >
-        <h2 className="text-xl font-bold mb-2">{title}</h2>
-        <p className="text-sm opacity-80">{description}</p>
-      </div>
-    );
-  }
-  
+import React from "react";
+
+export default function BentoCard({ title, value, emoji }) {
+  return (
+    <div className="bg-white shadow rounded p-4 w-40 text-center">
+      <div className="text-3xl mb-2">{emoji}</div>
+      <div className="text-xl font-bold">{value}</div>
+      <div className="text-gray-500">{title}</div>
+    </div>
+  );
+}
